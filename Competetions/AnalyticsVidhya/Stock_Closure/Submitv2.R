@@ -16,9 +16,18 @@
 # Outcome	                        Binary outcome variable representing whether price for one particular stock at the tomorrow’s market close is higher(1) or lower(0) compared to the price at today’s market close
 
 #All right around 8 GB available.
-setwd("/resources/rstudio")
-train<-read.csv("train.csv")
-test<-read.csv("test.csv")
+temp <- tempfile()
+download.file('https://github.com/meethariprasad/trikaal/raw/master/Competetions/AnalyticsVidhya/Stock_Closure/test_6lvBXoI.zip',temp)
+test <- read.csv(unz(temp, "test.csv"))
+unlink(temp)
+
+
+temp <- tempfile()
+download.file('https://github.com/meethariprasad/trikaal/raw/master/Competetions/AnalyticsVidhya/Stock_Closure/train_xup5Mf8.zip',temp)
+#Please wait for 60 Mb file to load.
+train <- read.csv(unz(temp, "train.csv"))
+unlink(temp)
+
 save(test,train,file = "base.RData")
 
 
