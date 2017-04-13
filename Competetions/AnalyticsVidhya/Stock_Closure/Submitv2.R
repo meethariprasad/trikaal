@@ -1,5 +1,248 @@
-# #Following is not a code but analysis of Cross Validation.
-# 
+#Tried Some Serious Feature Engineering.
+
+# Variable	                      Definition
+# ID	                            Unique ID for each observation
+# Timestamp	                      Unique value representing one day
+# Stock_ID	                      Unique ID representing one stock
+# Volume	                        Normalized values of volume traded of given stock ID on that timestamp
+# Three_Day_Moving_Average	      Normalized values of three days moving average of Closing price for given stock ID (Including Current day)
+# Five_Day_Moving_Average       	Normalized values of five days moving average of Closing price for given stock ID (Including Current day)
+# Ten_Day_Moving_Average	        Normalized values of ten days moving average of Closing price for given stock ID (Including Current day)
+# Twenty_Day_Moving_Average	      Normalized values of twenty days moving average of Closing price for given stock ID (Including Current day)
+# True_Range	                    Normalized values of true range for given stock ID
+# Average_True_Range	            Normalized values of average true range for given stock ID
+# Positive_Directional_Movement	  Normalized values of positive directional movement for given stock ID
+# Negative_Directional_Movement	  Normalized values of negative directional movement for given stock ID
+# Outcome	                        Binary outcome variable representing whether price for one particular stock at the tomorrow’s market close is higher(1) or lower(0) compared to the price at today’s market close
+
+#All right around 8 GB available.
+temp <- tempfile()
+download.file('https://github.com/meethariprasad/trikaal/raw/master/Competetions/AnalyticsVidhya/Stock_Closure/test_6lvBXoI.zip',temp)
+test <- read.csv(unz(temp, "test.csv"))
+unlink(temp)
+
+
+temp <- tempfile()
+download.file('https://github.com/meethariprasad/trikaal/raw/master/Competetions/AnalyticsVidhya/Stock_Closure/train_xup5Mf8.zip',temp)
+#Please wait for 60 Mb file to load.
+train <- read.csv(unz(temp, "train.csv"))
+unlink(temp)
+
+save(test,train,file = "base.RData")
+
+
+load("base.RData")
+#Create Empty Response SalePrice
+test$Outcome<-NA
+ID<-test[,1]
+
+combi<-rbind(train,test)
+
+save(ID,combi,file = "combi.RData")
+
+load("combi.RData")
+
+#Copy orginal dataframe to impute
+combi.imp<-combi
+#rm(train,test)
+summary(combi.imp)
+
+#Handling Variables
+combi.imp$Outcome<-as.factor(combi.imp$Outcome)
+summary(combi.imp)
+
+
+
+combi.imp$Trend<-ifelse((combi.imp$Positive_Directional_Movement)>(combi.imp$Negative_Directional_Movement),1,0)
+combi.imp$Trend<-as.factor(combi.imp$Trend)
+combi.imp$Trend_Strength<-abs((combi.imp$Positive_Directional_Movement)-(combi.imp$Negative_Directional_Movement))
+
+combi.imp$Stock_ID<-as.factor(combi.imp$Stock_ID)
+
+#Removing ID and Timestamp
+combi.imp<-combi.imp[,3:ncol(combi.imp)]
+
+train.complete<-combi.imp[1:702739,]
+#Brurtally removing NA cases as the the number of such cases are small.
+train.complete<-train.complete[complete.cases(train.complete),]
+test.complete<-combi.imp[702740:804685,]
+
+save(combi.imp,test.complete,train.complete,file = "combi_imp.RData")
+rm(combi,combi.imp,test,train)
+
+setwd("/resources/rstudio")
+
+load("combi_imp.RData")
+
+#Trying Double Cross Over Feature
+#http://www.investopedia.com/terms/c/crossover.asphttp://www.investopedia.com/terms/c/crossover.asp
+
+rank.df<-data.frame(t(apply(-train.complete[,3:6], 1, rank, ties.method='min')))
+names(rank.df)<-c("Rank3","Rank5","Rank10","Rank20")
+
+rank.df.34<-data.frame(t(apply(-train.complete[,3:4], 1, rank, ties.method='min')))
+names(rank.df.34)<-c("Rank34_3","Rank34_4")
+
+rank.df.35<-data.frame(t(apply(-train.complete[,c(3,5)], 1, rank, ties.method='min')))
+names(rank.df.35)<-c("Rank35_3","Rank35_5")
+
+rank.df.36<-data.frame(t(apply(-train.complete[,c(3,6)], 1, rank, ties.method='min')))
+names(rank.df.36)<-c("Rank36_3","Rank36_6")
+
+rank.df<-cbind(rank.df,rank.df.34$Rank34_3,rank.df.35$Rank35_3,rank.df.36$Rank36_3)
+names(rank.df)<-c("Rank3_all","Rank5_all","Rank10_all","Rank20_all"
+                  ,"rank_34","rank_35","rank_36")
+
+save(rank.df,file = "rank.RData")
+
+#MACD Feature: http://www.investopedia.com/terms/m/macd.asp
+train.complete$MACD_3510<-train.complete$Ten_Day_Moving_Average-train.complete$Five_Day_Moving_Average
+train.complete$MACD_3510_Crossover<-ifelse(train.complete$MACD_3510>train.complete$Three_Day_Moving_Average,"Sell","Buy")
+
+#Volume Size Feature:Volume Categorization. Less than First QR,Greater than 3 QR, In between
+#http://www.investopedia.com/terms/a/averagedailytradingvolume.asp
+train.complete$Volume_Size<-ifelse(train.complete$Volume<=-0.40550,"low",train.complete$Volume)
+train.complete$Volume_Size<-ifelse(train.complete$Volume_Size>=0.05220 & train.complete$Volume_Size!="low","high",train.complete$Volume_Size)
+train.complete$Volume_Size<-ifelse(!train.complete$Volume_Size %in% c("low","high"),"medium",train.complete$Volume_Size)
+train.complete$Volume_Size<-as.factor(train.complete$Volume_Size)
+
+train.complete<-cbind(train.complete,rank.df)
+summary(train.complete)
+
+#Making appropriate new features as factors.
+
+train.complete$Rank3_all<-as.factor(train.complete$Rank3_all)
+train.complete$Rank5_all<-as.factor(train.complete$Rank5_all)
+train.complete$Rank10_all<-as.factor(train.complete$Rank10_all)
+train.complete$Rank20_all<-as.factor(train.complete$Rank20_all)
+train.complete$MACD_3510_Crossover<-as.factor(train.complete$MACD_3510_Crossover)
+train.complete$rank_34<-as.factor(train.complete$rank_34)
+train.complete$rank_35<-as.factor(train.complete$rank_35)
+train.complete$rank_36<-as.factor(train.complete$rank_36)
+
+save(train.complete,file = "train.RData")
+
+load("train.RData")
+summary(train.complete)
+names(train.complete)
+
+library(h2o)
+y<-c("Outcome")
+#Almost removing all default features and high moving average overall ranks.
+features=names(train.complete)[!names(train.complete) %in% c("Three_Day_Moving_Average",
+                                                             "Outcome"
+                                                             ,"Five_Day_Moving_Average"
+                                                             ,"Ten_Day_Moving_Average"
+                                                             ,"Twenty_Day_Moving_Average"
+                                                             ,"Positive_Directional_Movement"
+                                                             ,"Negative_Directional_Movement"
+                                                             ,"True_Range"
+                                                             ,"Rank5_all"
+                                                             ,"Rank10_all"
+                                                             ,"Rank20_all"
+                                                             ,"Average_True_Range"
+                                                             ,"Volume")]
+#features<-c("Negative_Directional_Movement","Positive_Directional_Movement")
+h2o.shutdown(prompt=F)
+
+library(audio)
+wait(10)
+
+#Check Linux system Memory size to allocate for h2o.
+as.numeric(system("awk '/MemFree/ {print $2}' /proc/meminfo",intern=TRUE))/1000000
+
+h2o.init(nthreads = -1,max_mem_size = "11g")
+
+train.hex<-as.h2o(train.complete)
+
+test.hex<-as.h2o(test.complete[,features])
+
+
+#Models
+gbmF_model_1 = h2o.gbm( x=features,
+                        y = y,
+                        training_frame =train.hex
+                        ,nfolds = 2
+                        #,nbins=30
+                        #,learn_rate = 0.001
+                        #,min_rows=2
+                        #,ntrees = 200
+                        #,nbins_cats = 2199
+                        ,seed=1234
+)
+
+gbmF_model_1
+
+
+#Best Parameter Search through cartesian search. Will take time!
+
+gbm_params2 <- list(learn_rate = c(0.001,0.01, 0.1),
+                    max_depth = c(5, 10, 15),
+                    sample_rate = c(0.6,0.8,1.0),
+                    col_sample_rate = c(0.2, 0.5, 0.8,1.0))
+
+#In case you want Random Search run below and add it to h2o.grid in search criteria.
+#search_criteria2 <- list(strategy = "RandomDiscrete", max_models = 36)
+
+# Train and validate a grid of GBMs
+gbm_grid2 <- h2o.grid("gbm", x = features, y = y,
+                      training_frame = train.hex
+                      ,grid_id = "gbm_grid2"
+                      ,nfolds=2
+                      #validation_frame = valid,
+                      #,ntrees = 200,
+                      ,seed = 1234
+                      ,hyper_params = gbm_params2)
+
+gbm_gridperf2 <- h2o.getGrid(grid_id = "gbm_grid2" 
+                             ,sort_by = "logloss"
+                             ,decreasing = TRUE)
+print(gbm_gridperf2)
+
+best_gbm_model_id <- gbm_gridperf2@model_ids[[1]]
+best_gbm <- h2o.getModel(best_gbm_model_id)
+
+#Comparision of best_gbm and earlier gbm model performance.
+best_gbm
+
+gbmF_model_1
+
+
+#Variable importance selection. Any thing with overall percent > 1.
+vip<-h2o.varimp(best_gbm)
+vip.imp<-vip[which(vip$percentage*100>1),]$variable
+features<-vip.imp
+#Added some more parameters to add more power to GBM.
+gbmF_model_1 = h2o.gbm( x=features,
+                        y = y,
+                        training_frame =train.hex,
+                        nbins_cats = 2199,
+                        ntrees = 5000,
+                        learn_rate = 0.0001
+                        ,seed=1234
+)
+gbmF_model_1
+
+#Running GLM
+glm_model_1 = h2o.glm( x=features,
+                       y = y,
+                       training_frame =train.hex
+                       ,nfolds = 3
+                       ,family="binomial"
+                       ,seed=1234
+)
+h2o.performance(glm_model_1)
+glm_model_1
+
+#Running DeepLearning
+dl_model_1<-h2o.deeplearning(x=features,
+                             y = y
+                             ,nfolds=3
+                             ,training_frame =train.hex
+                             ,seed=1234)
+
+#Following is not a code but analysis of Cross Validation.
+
 # > dl_model_1
 # Model Details:
 #   ==============
