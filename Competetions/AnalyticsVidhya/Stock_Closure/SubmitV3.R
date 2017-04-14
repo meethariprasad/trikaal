@@ -75,8 +75,8 @@ View(train.complete[which(train.complete$Stock_ID==2),])
 
 #See the NA present columns. 
 #Case 1. It is present in Moving Averages.  See the number of NA.
-#You can see that NA are genuinely not available values.
-#Case 2: Volume, +/-PDM,TR,ATR all 
+#You can see that NA are genuinely not available values for most of the cases as in initial needed cut off days you will not have MA.
+#Case 2: Volume, +/-PDM,TR,ATR all apperently looks like missing values in some cases.
 #Consider it is a time series based problem NA handling might be appropriate by putting
 #Next available NA value in the series as we have already ordered test and train
 library(zoo)
@@ -170,34 +170,6 @@ load("combi_imp.RData")
 
 
 #Making appropriate new features as factors.
-#Modeling Plan
-
-
-#Step 1: Sliding Window on Every StockID and remove TimeID. 
-#Every row of previous time ID and appropriate Stock ID must go to next timestamp row.
-#To do this add an empty row in begining with NA for copy of Stock ID Group
-#Bind it with every group.
-#Step 2: Model. Stock ID as factor will ensure predictions will be based on matching Stock ID & Related Patterns.
-#Step 3: Predict
-
-#Sliding Window
-
-#from stock ID 1 to Stock ID N (We are going to include Stock ID, as it might be only
-#thing which connects to domain specific feature set and 
-#also test and train has same set of Stocks). 
-
-#UPDATE!This assumption of Test and Train has same stock ID is found wrong! 
-#But would have been a good approach.
-#In case of test and train stock ID match
-
-#get the subset of stock ID DF, Say it is past data.
-#Slide it by one row by adding a Row 1 again in the begining to avoid NULL.
-#Have same subset of stock ID. Call it current and add a copy of last row at the end.
-#Merge both Data sets columnwise. C bind.
-#Then add all individual data sets rowwise.
-#Repeat the same process for test set.
-
-#So the method left is run it without sliding window without StockID and only with new features.
 
 
 combi.imp$MACD_3510_Crossover<-as.factor(combi.imp$MACD_3510_Crossover)
@@ -254,7 +226,6 @@ features=names(combi.imp)[!names(combi.imp) %in% c("Three_Day_Moving_Average"
 )]
 str(combi.imp[features])
 
-#features<-c("Negative_Directional_Movement","Positive_Directional_Movement")
 h2o.shutdown(prompt=F)
 
 library(audio)
@@ -279,12 +250,6 @@ gbmF_model_1 = h2o.gbm( x=features,
                         ,learn_rate = 0.001
                         ,ntrees = 800
                         ,distribution="AUTO"
-                        
-                        ## stop as soon as loss doesn't improve by more than 0.1% on the validation set,
-                        ## for 2 consecutive scoring events
-                        #stopping_rounds = 2,
-                        ,stopping_tolerance = 1e-3
-                        ,stopping_metric = "logloss"
                         ,max_depth=10
                         ,min_rows=20
                         ,col_sample_rate_per_tree=0.6
@@ -313,11 +278,6 @@ gbmF_model_1 = h2o.gbm( x=features,
                         ,learn_rate = 0.001
                         ,ntrees = 1000
                         ,distribution="AUTO"
-                        ## stop as soon as loss doesn't improve by more than 0.1% on the validation set,
-                        ## for 2 consecutive scoring events
-                        #stopping_rounds = 2,
-                        #,stopping_tolerance = 1e-3
-                        #,stopping_metric = "logloss"
                         ,max_depth=10
                         ,min_rows=20
                         ,col_sample_rate_per_tree=0.6
@@ -496,11 +456,6 @@ gbmF_model_1 = h2o.gbm( x=features,
                         ,learn_rate = 0.001
                         ,ntrees = 1000
                         ,distribution="AUTO"
-                        ## stop as soon as loss doesn't improve by more than 0.1% on the validation set,
-                        ## for 2 consecutive scoring events
-                        #stopping_rounds = 2,
-                        #,stopping_tolerance = 1e-3
-                        #,stopping_metric = "logloss"
                         ,max_depth=10
                         ,min_rows=20
                         ,col_sample_rate_per_tree=0.6
@@ -510,7 +465,7 @@ gbmF_model_1 = h2o.gbm( x=features,
                         ,seed=1234
 )
 
-#You can see that by no feature engineering your CV log loss is 0.66, AUC:0.66
+#You can see that by no feature engineering your CV log loss is 0.66, AUC:0.67
 #With Domain Knowledge Based Feature Eng: You can achieve amazing results.
 
 # gbmF_model_1
@@ -614,69 +569,13 @@ gbmF_model_1 = h2o.gbm( x=features,
 # specificity              0.21949174  0.018271388   0.1936521  0.24533139
 # > 
 
-
-
-
-
-
-
-
-
-
-#Search through cartesian search. Will take time!
-
-gbm_params2 <- list(learn_rate = c(0.001,0.01, 0.1),
-                    max_depth = c(5, 10, 15),
-                    sample_rate = c(0.6,0.8,1.0),
-                    col_sample_rate = c(0.2, 0.5, 0.8,1.0))
-
-#In case you want Random Search run below and add it to h2o.grid in search criteria.
-#search_criteria2 <- list(strategy = "RandomDiscrete", max_models = 36)
-
-# Train and validate a grid of GBMs
-gbm_grid2 <- h2o.grid("gbm", x = features, y = y,
-                      training_frame = train.hex
-                      ,grid_id = "gbm_grid2"
-                      ,nfolds=2
-                      #validation_frame = valid,
-                      #,ntrees = 200,
-                      ,seed = 1234
-                      ,hyper_params = gbm_params2)
-
-gbm_gridperf2 <- h2o.getGrid(grid_id = "gbm_grid2" 
-                             ,sort_by = "logloss"
-                             ,decreasing = TRUE)
-print(gbm_gridperf2)
-
-best_gbm_model_id <- gbm_gridperf2@model_ids[[1]]
-best_gbm <- h2o.getModel(best_gbm_model_id)
-
-#Comparision of best_gbm and earlier gbm model performance.
-best_gbm
-
-gbmF_model_1
-
-
-#Variable importance selection. Any thing with overall percent > 1.
-vip<-h2o.varimp(best_gbm)
-vip.imp<-vip[which(vip$percentage*100>1),]$variable
-features<-vip.imp
-#Added some more parameters to add more power to GBM.
-gbmF_model_1 = h2o.gbm( x=features,
-                        y = y,
-                        training_frame =train.hex,
-                        nbins_cats = 2199,
-                        ntrees = 5000,
-                        learn_rate = 0.0001
-                        ,seed=1234
-)
-gbmF_model_1
+#Running other models in case you want to ensemble.
 
 #Running GLM
 glm_model_1 = h2o.glm( x=features,
                        y = y,
                        training_frame =train.hex
-                       ,nfolds = 3
+                       ,nfolds = 2
                        ,family="binomial"
                        ,seed=1234
 )
@@ -698,9 +597,6 @@ dl_model_1
 predict_gbm = as.data.frame(h2o.predict(gbmF_model_1, newdata = test.hex))
 predict_gbm_response<-as.character(predict_gbm$predict)
 
-predict_rf = as.data.frame(h2o.predict(rf_model_1, newdata = test.hex))
-predict_rf_response<-as.character(predict_rf$predict)
-
 predict_glm = as.data.frame(h2o.predict(glm_model_1, newdata = test.hex))
 predict_glm_response<-as.character(predict_glm$predict)
 
@@ -712,10 +608,6 @@ ID=as.character(ID)
 submit<-(data.frame(cbind(ID=ID,Outcome=predict_gbm_response)))
 names(submit)<-c("ID","Outcome")
 write.csv(submit,file = "submit_gbm.csv",row.names = F)
-
-submit<-(data.frame(cbind(ID=ID,Outcome=predict_rf_response)))
-names(submit)<-c("ID","Outcome")
-write.csv(submit,file = "submit_rf.csv",row.names = F)
 
 submit<-(data.frame(cbind(ID=ID,Outcome=predict_glm_response)))
 names(submit)<-c("ID","Outcome")
