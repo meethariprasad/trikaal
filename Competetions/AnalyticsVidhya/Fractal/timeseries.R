@@ -86,7 +86,7 @@ summary(combi$Category_1)
 summary(combi$Category_2)
 #There are huge number of NA.
 #We have 3 choice. Predictive replacement
-#Replace it with Median
+#Replace it with Mean
 #or ignore columns.
 #let us do predictive replacement after checking Cat3
 #Category 3
@@ -108,7 +108,7 @@ test<-combi[(nrowtrain+1):nrow(combi),]
 
 #Let us predictively remove NA from Cat2
 #Oops! Missforest is not working becaue of too many levels.
-#Let us replace it with Median.
+#Let us replace it with Mean.
 combi$Category_2[is.na(combi$Category_2)] <- mean(na.omit(train$Category_2))
 
 #Ok. Now we have some modeling.
