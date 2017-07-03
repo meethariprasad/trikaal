@@ -1,5 +1,7 @@
 setwd("D:/DataScience/Analytics Vidhya/fractal-timeseries")
 
+#Unzip Train & Test in the present working directory.
+
 #Problem Statement
 # Welcome to Antallagma - a digital exchange for trading goods. Antallagma started its operations 
 #5 years back and has 
@@ -42,9 +44,13 @@ setwd("D:/DataScience/Analytics Vidhya/fractal-timeseries")
 # Category_2	Ordered Masked feature
 # Category_3	Binary Masked feature
 
+#Data Load.
+
 test <- read.csv("test.csv")
 
 train <- read.csv( "train.csv")
+
+#Exploratory Analysis
 
 names(train)
 names(test)
@@ -121,19 +127,26 @@ train <- train[order(train$Item_ID, train$Datetime),]
 test <- test[order(test$Item_ID, test$Datetime),]
 
 #Also found that test & train has same levels
-#Now let us add some more columns like weekday, month, quarter, season
+#Now let us add some more columns like weekday, month, quarter
 #Let us combine test & train now.
 combi<-rbind(train,test)
 
-#Lubridate
+#Feature Engineering
+#First let us make Datetime column data type as date using Lubridate package.
 library(lubridate)
 combi$Datetime<-lubridate::ymd(combi$Datetime)
 
 #Added Weekday column.
+#Hypothesis is the trade of certain goods might be dependent on day of the week.
 combi$Wday<-wday(combi$Datetime)
 
 #Added Quarter Day column
+#Hypothesis is the trade of certain goods might be dependent on day of quarter.
 combi$Qday<-qday(combi$Datetime)
+
+#I could have added month day to check improvement in model data.
+# But not added as I believe might except begining and end of the month, rest of the data patern might be explained better in Weekday variable.
+
 
 
 #Ok. Now we have some modeling.
@@ -141,7 +154,11 @@ train<-combi[1:nrowtrain,]
 test<-combi[(nrowtrain+1):nrow(combi),]
 
 #First we will predict volume. Then we will predict the price.
+#Hypothesis is: Find the trade volume first. Prices are typically driven by trade volume 
+#Yes it can happen other way around also. I might have done both the ways and ensembled the results maybe!
+#That is the work for further improvement section.
 
+#Using H2o because of huge data and I joined 30 minutes before stop clock to competetion!
 library("h2o")
 h2o.init(nthreads = -1,max_mem_size = "8g")
 y<-c("Number_Of_Sales","Price")
@@ -153,7 +170,7 @@ train.hex<-as.h2o(train[,c(features,y)])
 gbmF_model_sales = h2o.gbm( x=features,
                         y = y[1],
                         training_frame =train.hex
-                        #,nfolds = 2
+                        #,nfolds = 10 #Commented for nfolds for saving time.
                         ,nbins=50
                         ,learn_rate = 0.001
                         ,ntrees = 800
@@ -172,7 +189,7 @@ gbmF_model_sales
 gbmF_model_price = h2o.gbm( x=c(features,y[1]),
                         y = y[2],
                         training_frame =train.hex
-                        #,nfolds = 2
+                        #,nfolds = 10 #Commented for nfolds for saving time.
                         ,nbins=50
                         ,learn_rate = 0.001
                         ,ntrees = 800
@@ -220,6 +237,8 @@ h2o.shutdown(prompt=F)
 
 #Addition of Lagging Features
 #Merging past and present features at row level itemwise & daywise & predicting the Price & Volume
-#Ensemble!
+#Ensemble of following:
+# Uncorelated Algorithm Results.
+# Price Driving Volume & Volume Driving Price.
 
 
