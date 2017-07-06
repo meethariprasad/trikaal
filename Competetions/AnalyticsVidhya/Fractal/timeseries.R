@@ -1,4 +1,4 @@
-setwd("D:/DataScience/Analytics Vidhya/fractal-timeseries")
+setwd("~/resources/rstudio/fractal-hiring")
 
 #Unzip Train & Test in the present working directory.
 
@@ -153,6 +153,10 @@ combi$Qday<-qday(combi$Datetime)
 train<-combi[1:nrowtrain,]
 test<-combi[(nrowtrain+1):nrow(combi),]
 
+summary(train)
+
+summary(test)
+
 #First we will predict volume. Then we will predict the price.
 #Hypothesis is: Find the trade volume first. Prices are typically driven by trade volume 
 #Yes it can happen other way around also. I might have done both the ways and ensembled the results maybe!
@@ -160,7 +164,7 @@ test<-combi[(nrowtrain+1):nrow(combi),]
 
 #Using H2o because of huge data and I joined 30 minutes before stop clock to competetion!
 library("h2o")
-h2o.init(nthreads = -1,max_mem_size = "8g")
+h2o.init(nthreads = -1,max_mem_size = "15g")
 y<-c("Number_Of_Sales","Price")
 features=names(train)[!names(train) %in% c("Number_Of_Sales","Price","Datetime")]
 
@@ -168,39 +172,39 @@ train.hex<-as.h2o(train[,c(features,y)])
 
 #Models
 gbmF_model_sales = h2o.gbm( x=features,
-                        y = y[1],
-                        training_frame =train.hex
-                        #,nfolds = 10 #Commented for nfolds for saving time.
-                        ,nbins=50
-                        ,learn_rate = 0.001
-                        ,ntrees = 800
-                        ,distribution="AUTO"
-                        ,max_depth=10
-                        ,min_rows=20
-                        ,col_sample_rate_per_tree=0.6
-                        ,col_sample_rate=0.8
-                        ,sample_rate=0.6
-                        ,nbins_cats = 2199
-                        ,seed=1234
+                            y = y[1],
+                            training_frame =train.hex
+                            ,nfolds = 3 #Commented for nfolds for saving time.
+                            ,nbins=50
+                            ,learn_rate = 0.001
+                            ,ntrees = 800
+                            ,distribution="AUTO"
+                            ,max_depth=10
+                            ,min_rows=20
+                            ,col_sample_rate_per_tree=0.6
+                            ,col_sample_rate=0.8
+                            ,sample_rate=0.6
+                            ,nbins_cats = 2200#Ideally I would have went for number of unique levels in Item ID. Whatever I had was greater than that. So kept it as is.
+                            ,seed=1234
 )
 
 gbmF_model_sales
 
 gbmF_model_price = h2o.gbm( x=c(features,y[1]),
-                        y = y[2],
-                        training_frame =train.hex
-                        #,nfolds = 10 #Commented for nfolds for saving time.
-                        ,nbins=50
-                        ,learn_rate = 0.001
-                        ,ntrees = 800
-                        ,distribution="AUTO"
-                        ,max_depth=10
-                        ,min_rows=20
-                        ,col_sample_rate_per_tree=0.6
-                        ,col_sample_rate=0.8
-                        ,sample_rate=0.6
-                        ,nbins_cats = 2199
-                        ,seed=1234
+                            y = y[2],
+                            training_frame =train.hex
+                            ,nfolds = 3 #Commented for nfolds for saving time.
+                            ,nbins=50
+                            ,learn_rate = 0.001
+                            ,ntrees = 800
+                            ,distribution="AUTO"
+                            ,max_depth=10
+                            ,min_rows=20
+                            ,col_sample_rate_per_tree=0.6
+                            ,col_sample_rate=0.8
+                            ,sample_rate=0.6
+                            ,nbins_cats = 2200#Ideally I would have went for number of unique levels in Item ID. Whatever I had was greater than that. So kept it as is.
+                            ,seed=1234
 )
 
 gbmF_model_price
@@ -212,18 +216,18 @@ test.hex<-as.h2o(test[,c(features)])
 #Prediction
 
 #We will start by predicting sales volume then price
-predict_gbm_sales = as.data.frame(h2o.predict(gbmF_model_sales, newdata = test.hex))
-predict_gbm_sales.hex<-as.h2o(predict_gbm_sales)
+predict_gbm_sales = h2o.predict(gbmF_model_sales, newdata = test.hex)
 
-#Merge the prediction with test data to further predict price.
-test.hex$Number_Of_Sales<-predict_gbm_sales.hex$Number_Of_Sales
+#Merge the prediction with test data to further predict sales.
+test.hex$Number_Of_Sales<-predict_gbm_sales$predict
 
-predict_gbm_price = as.data.frame(h2o.predict(gbmF_model_price, newdata = test.hex))
-predict_gbm_price.hex<-as.h2o(predict_gbm_price)
-test.hex$Price<-predict_gbm_price.hex$predict
+#Now we will predict price.
+predict_gbm_price = h2o.predict(gbmF_model_price, newdata = test.hex)
+test.hex$Price<-predict_gbm_price$predict
 
 #Let us put submission script in place.
 test.frame<-as.data.frame(test.hex)
+#Oops! I lost test ID in the process. Let me bring it back properly. Not a great way to code!
 test <- read.csv("test.csv")
 test <- test[order(test$Item_ID, test$Datetime),]
 ID=as.character(test$ID)
@@ -240,5 +244,4 @@ h2o.shutdown(prompt=F)
 #Ensemble of following:
 # Uncorelated Algorithm Results.
 # Price Driving Volume & Volume Driving Price.
-
 
