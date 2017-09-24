@@ -337,7 +337,7 @@ gbmF_model_1
 # ** Reported on cross-validation data. **
 #   ** 2-fold cross-validation on training data (Metrics computed for combined holdout predictions) **
 #   
-#   MSE:  0.06967006
+#  MSE:  0.06967006
 # RMSE:  0.2639509
 # LogLoss:  0.299142
 # Mean Per-Class Error:  0.008609118
@@ -345,7 +345,7 @@ gbmF_model_1
 # Gini:  0.9994026
 # 
 # Confusion Matrix (vertical: actual; across: predicted) for F1-optimal threshold:
-#   0      1    Error          Rate
+#           0      1    Error          Rate
 # 0      381878   2578 0.006706  =2578/384456
 # 1        3346 314937 0.010513  =3346/318283
 # Totals 385224 317515 0.008430  =5924/702739
@@ -495,7 +495,7 @@ gbmF_model_1 = h2o.gbm( x=features,
 # Gini:  0.3436593
 # 
 # Confusion Matrix (vertical: actual; across: predicted) for F1-optimal threshold:
-#   0      1    Error            Rate
+#         0      1    Error            Rate
 # 0      74106 310350 0.807245  =310350/384456
 # 1      18355 299928 0.057669   =18355/318283
 # Totals 92461 610278 0.467748  =328705/702739
