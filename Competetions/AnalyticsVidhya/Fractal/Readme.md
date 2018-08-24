@@ -1,3 +1,9 @@
+Final Overall Global Rank in competetion: 2
+
+https://datahack.analyticsvidhya.com/contest/fractal-analytics-hiring-hackathon/pvt_lb
+Rank Name
+2		 meethariprasad
+
 Problem Statement
 Welcome to Antallagma - a digital exchange for trading goods. Antallagma started its operations 5 years back and has supported more than a million transactions till date. The Antallagma platform enables working of a traditional exchange on an online portal. 
 
